@@ -13,7 +13,7 @@ from exceptions import (
     VariablesException,
     EmptyResponseException,
     SendingMessageException
-    )
+)
 
 load_dotenv()
 
@@ -42,7 +42,7 @@ logger.addHandler(handler)
 
 
 def send_message(bot, message):
-    """Функция отправки сообщений ботом"""
+    """Функция отправки сообщений ботом."""
     try:
         bot.send_message(
             chat_id=TELEGRAM_CHAT_ID,
@@ -74,7 +74,7 @@ def get_api_answer(current_timestamp):
 
 
 def check_response(response):
-    """Проверка правильности ответа API-Домашки"""
+    """Проверка правильности ответа API-Домашки."""
     if not response:
         raise EmptyResponseException(
             f'В ответе сервера нет данных - {response}')
@@ -94,7 +94,7 @@ def check_response(response):
 
 
 def parse_status(homework):
-    """Парсинг информации о статусе проверки"""
+    """Парсинг информации о статусе проверки."""
     if isinstance(homework, list):
         homework = homework[0]
 
@@ -115,7 +115,7 @@ def parse_status(homework):
 
 
 def check_tokens():
-    """Проверка наличия переменных"""
+    """Проверка наличия переменных."""
     if PRACTICUM_TOKEN is None:
         logger.critical(
             'Отсутствует переменная: PRACTICUM_TOKEN')
@@ -136,7 +136,7 @@ def main():
     if not check_tokens():
         raise VariablesException(
             'Нет необходимых переменных, работа бота прекращена'
-            )
+        )
 
     new_error: str = ''
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
