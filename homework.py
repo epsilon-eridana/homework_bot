@@ -1,8 +1,10 @@
-# from logging import Logger
+import logging
 import sys
+import os
 
 import time
 from http import HTTPStatus
+from dotenv import load_dotenv
 
 import requests
 import telegram
@@ -11,6 +13,12 @@ import exceptions
 from logcfg import logger_setup
 import constants
 
+load_dotenv()
+
+PRACTICUM_TOKEN = os.getenv('PKTOKEN')
+TELEGRAM_TOKEN = os.getenv('TGTOKEN')
+TELEGRAM_CHAT_ID = os.getenv('CHAT')
+HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
 
 logger = logger_setup(__name__)
 
@@ -19,12 +27,12 @@ def send_message(bot, message):
     """Sending message in telegram."""
     try:
         bot.send_message(
-            chat_id=constants.TELEGRAM_CHAT_ID,
+            chat_id=TELEGRAM_CHAT_ID,
             text=message
         )
     except exceptions.SendMessageException:
         logger.error(
-            f'Error sending message to user - {constants.TELEGRAM_CHAT_ID}')
+            f'Error sending message to user - {TELEGRAM_CHAT_ID}')
 
 
 def get_api_answer(current_timestamp):
@@ -33,7 +41,7 @@ def get_api_answer(current_timestamp):
     params = {'from_date': timestamp}
     try:
         response = requests.get(constants.ENDPOINT,
-                                headers=constants.HEADERS, params=params)
+                                headers=HEADERS, params=params)
     except Exception:
         error = 'API is not accesible'
         logger.error(error)
@@ -83,10 +91,10 @@ def parse_status(homework: dict):
         if homework_status in constants.HOMEWORK_STATUSES.keys():
             verdict = constants.HOMEWORK_STATUSES.get(homework_status)
             logger.error(
-                f'Homework status changed: {verdict}')
+                f'Изменился статус проверки работы: {verdict}')
             return (
-                f'Homework status changed '
-                f'"{homework_name}". {verdict}')
+                f'Изменился статус проверки работы "{homework_name}".{verdict}'
+            )
         elif homework_status not in constants.HOMEWORK_STATUSES.keys():
             logger.error(
                 f'Unknown status of the homework: {homework_status}'
@@ -108,9 +116,9 @@ def parse_status(homework: dict):
 def check_tokens():
     """Checking constants."""
     return all(
-        [constants.PRACTICUM_TOKEN,
-         constants.TELEGRAM_TOKEN,
-         constants.TELEGRAM_CHAT_ID]
+        [PRACTICUM_TOKEN,
+         TELEGRAM_TOKEN,
+         TELEGRAM_CHAT_ID]
         )
 
 
@@ -121,7 +129,7 @@ def main():
         logger.critical(message)
         sys.exit(message)
     current_timestamp = int(0)
-    bot = telegram.Bot(token=constants.TELEGRAM_TOKEN)
+    bot = telegram.Bot(token=TELEGRAM_TOKEN)
     while True:
         try:
             """Request for API"""
