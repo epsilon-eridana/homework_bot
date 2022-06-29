@@ -1,26 +1,34 @@
+from http import HTTPStatus
 import logging
 import sys
-import os
-
+import requests
 import time
-from http import HTTPStatus
+
+import telegram
 from dotenv import load_dotenv
 
-import requests
-import telegram
-
-import exceptions
-from logcfg import logger_setup
-import constants
+from exceptions import (
+    SendMessageException,
+    GetAPIException,
+    ResponseJsonException,
+    HomeworkStatusError,
+)
+from logger import logger_conf
+from constants import (
+    RETRY_TIME,
+    ENDPOINT,
+    HOMEWORK_STATUSES,
+)
+from variables import (
+    HEADERS,
+    PRACTICUM_TOKEN,
+    TELEGRAM_TOKEN,
+    TELEGRAM_CHAT_ID,
+)
 
 load_dotenv()
 
-PRACTICUM_TOKEN = os.getenv('PKTOKEN')
-TELEGRAM_TOKEN = os.getenv('TGTOKEN')
-TELEGRAM_CHAT_ID = os.getenv('CHAT')
-HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
-
-logger = logger_setup(__name__)
+logger = logging.getLogger(__name__)
 
 
 def send_message(bot, message):
@@ -30,51 +38,67 @@ def send_message(bot, message):
             chat_id=TELEGRAM_CHAT_ID,
             text=message
         )
-    except exceptions.SendMessageException:
+        logger.info(f'The message was sended into chat {TELEGRAM_CHAT_ID}')
+    except SendMessageException:
         logger.error(
-            f'Error sending message to user - {TELEGRAM_CHAT_ID}')
+            f'Error sending message to user - {TELEGRAM_CHAT_ID}'
+        )
 
 
 def get_api_answer(current_timestamp):
     """Sending request to API."""
-    timestamp = current_timestamp or int(0)
+    timestamp = current_timestamp or int(time.time())
     params = {'from_date': timestamp}
     try:
-        response = requests.get(constants.ENDPOINT,
+        response = requests.get(ENDPOINT,
                                 headers=HEADERS, params=params)
     except Exception:
         error = 'API is not accesible'
         logger.error(error)
-        raise exceptions.GetAPIException(error)
+        raise GetAPIException(error)
     if response.status_code != HTTPStatus.OK:
         response.raise_for_status()
         error = 'Error, wrong HTTP status code'
         logger.error(error)
-        raise exceptions.GetAPIException(error)
+        raise GetAPIException(error)
     try:
-        return response.json()
-    except exceptions.ResponseJsonException:
+        response = response.json()
+    except ResponseJsonException:
         logger.error(
             f'Error transformation of response into json format'
             f' - {type(response)}'
         )
-        raise exceptions.ResponseJsonException(
+        raise ResponseJsonException(
             f'Error transformation of response into json format'
             f' - {type(response)}'
         )
+    logger.info('Request to API is sended.')
+    return response
 
 
 def check_response(response: dict) -> list:
     """Checking API response."""
     if not isinstance(response, dict):
-        raise TypeError
-    if 'homeworks' in response:
-        if isinstance(response['homeworks'], list):
-            if not response['homeworks']:
-                logger.error('В ответе нет новых статусов.')
-            return response['homeworks']
-    raise exceptions.ResponseDataError(
-        'Отсутствуют ожидаемые ключи в ответе API.')
+        raise TypeError('APIs answer is not a dictionary.')
+    homeworks = response.get('homeworks')
+    if homeworks is None:
+        raise KeyError(
+            'APIs answer does not contains data about homework.'
+            'APIs response: ', response
+        )
+    current_date = response.get('current_date')
+    if current_date is None:
+        raise KeyError('There is no current date in the APIs answer.')
+    if not isinstance(homeworks, list):
+        raise TypeError(
+            "Answer with a 'homeworks' key is not a list."
+        )
+    if not isinstance(current_date, int):
+        raise TypeError(
+            "Answer with a 'current_date' key in not an integer."
+        )
+    logging.info('Checking APIs answer passed.')
+    return homeworks
 
 
 def parse_status(homework: dict):
@@ -84,22 +108,22 @@ def parse_status(homework: dict):
             logger.error('No key: "homework_name"')
             raise KeyError('No key: "homework_name"')
         elif "status" not in homework.keys():
-            logger('No key: "status"')
+            logger.error('No key: "status"')
             raise KeyError('No key: "status"')
         homework_name = homework.get("homework_name")
         homework_status = homework.get("status")
-        if homework_status in constants.HOMEWORK_STATUSES.keys():
-            verdict = constants.HOMEWORK_STATUSES.get(homework_status)
+        if homework_status in HOMEWORK_STATUSES.keys():
+            verdict = HOMEWORK_STATUSES.get(homework_status)
             logger.error(
-                f'Изменился статус проверки работы: {verdict}')
+                f'Status of the homework is changed: {verdict}')
             return (
-                f'Изменился статус проверки работы "{homework_name}".{verdict}'
+                f'Изменился статус проверки работы "{homework_name}". {verdict}'
             )
-        elif homework_status not in constants.HOMEWORK_STATUSES.keys():
+        elif homework_status not in HOMEWORK_STATUSES.keys():
             logger.error(
                 f'Unknown status of the homework: {homework_status}'
             )
-            raise exceptions.ParseDataError(
+            raise HomeworkStatusError(
                 f'Unknown status of the homework: {homework_status}'
             )
     elif homework == []:
@@ -119,7 +143,7 @@ def check_tokens():
         [PRACTICUM_TOKEN,
          TELEGRAM_TOKEN,
          TELEGRAM_CHAT_ID]
-        )
+    )
 
 
 def main():
@@ -132,23 +156,30 @@ def main():
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     while True:
         try:
-            """Request for API"""
             response = get_api_answer(current_timestamp)
-            """Checking answer"""
-            check_response(response)
-            """Getting homework status"""
-            message = parse_status(response.get('homeworks')[0])
-            send_message(bot, message)
-            if not check_tokens():
-                logger.critical('Missing required environment variable!')
-                raise SystemExit()
-            current_timestamp = int(time.time())
-            time.sleep(constants.RETRY_TIME)
-
+            homeworks_list = check_response(response)
+            if len(homeworks_list) > 0:
+                for homework in homeworks_list:
+                    status_msg = parse_status(homework)
+                    send_message(bot, status_msg)
+            else:
+                logger.debug(
+                    'Новых записей о статусах домашних работ не найдено'
+                )
+            current_timestamp = response.get(
+                'current_date',
+                int(time.time())
+            )
         except Exception as error:
-            message = f'Program crash: {error}'
-            time.sleep(constants.RETRY_TIME)
+            message = f'Ошибка в работе: {error}'
+            logger.error(message)
+            if error != PREVIOUS_ERROR:
+                PREVIOUS_ERROR = error
+                send_message(bot, message)
+        finally:
+            time.sleep(RETRY_TIME)
 
 
 if __name__ == '__main__':
+    logger_conf()
     main()

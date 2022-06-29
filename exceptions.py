@@ -1,40 +1,17 @@
-class CheckResponseAPI(Exception):
-    """Исключение для проверки запроса к API на корректность"""
-    pass
-
-
-class APIResponseException(Exception):
-    pass
-
-
 class SendMessageException(Exception):
     pass
 
 
 class GetAPIException(Exception):
+    """Error of access to API."""
     pass
 
 
 class ResponseJsonException(Exception):
-    """Ошибка сериализации ответа от серверая."""
+    """Error of parsing APIs answer into json."""
     pass
 
 
-class EmptyAPIResponseError(Exception):
-    pass
-
-
-class StatusException(Exception):
-    pass
-
-
-class ResponseDataError(Exception):
-    pass
-
-
-class StatusKeyError(Exception):
-    pass
-
-
-class ParseDataError(Exception):
+class HomeworkStatusError(Exception):
+    """Error of collecting unknown status of the homework, that not in STATUSES constant."""
     pass
