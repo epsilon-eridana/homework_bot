@@ -117,7 +117,8 @@ def parse_status(homework: dict):
             logger.error(
                 f'Status of the homework is changed: {verdict}')
             return (
-                f'Изменился статус проверки работы "{homework_name}". {verdict}'
+                f'Изменился статус проверки работы "{homework_name}".'
+                f'{verdict}'
             )
         elif homework_status not in HOMEWORK_STATUSES.keys():
             logger.error(
@@ -152,6 +153,7 @@ def main():
         message = 'Missing required environment variable'
         logger.critical(message)
         sys.exit(message)
+    PREVIOUS_ERROR = ''
     current_timestamp = int(0)
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     while True:
