@@ -1,7 +1,7 @@
 from http import HTTPStatus
 import logging
-import sys
 import requests
+import sys
 import time
 
 import telegram
@@ -83,7 +83,7 @@ def check_response(response: dict) -> list:
     homeworks = response.get('homeworks')
     if homeworks is None:
         raise KeyError(
-            'APIs answer does not contains data about homework.'
+            'APIs response does not contains data about homework.'
             'APIs response: ', response
         )
     current_date = response.get('current_date')
@@ -91,11 +91,13 @@ def check_response(response: dict) -> list:
         raise KeyError('There is no current date in the APIs answer.')
     if not isinstance(homeworks, list):
         raise TypeError(
-            "Answer with a 'homeworks' key is not a list."
+            "Response with a 'homeworks' key is not a list."
+            'APIs response: ', response
         )
     if not isinstance(current_date, int):
         raise TypeError(
-            "Answer with a 'current_date' key in not an integer."
+            "Response with a 'current_date' key in not an integer."
+            'APIs response: ', response
         )
     logging.info('Checking APIs answer passed.')
     return homeworks
@@ -154,7 +156,7 @@ def main():
         logger.critical(message)
         sys.exit(message)
     PREVIOUS_ERROR = ''
-    current_timestamp = int(0)
+    current_timestamp = int(time.time())
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     while True:
         try:
